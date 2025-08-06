@@ -31,21 +31,21 @@ class CircleDetector:
         
         # 形态学闭运算
         element = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-        iteration = 5
+        iteration = 21
         closeMat = cv2.morphologyEx(gray, cv2.MORPH_CLOSE, element, iterations=iteration)
         
         # 背景减除
         calcMat = cv2.bitwise_not(cv2.subtract(closeMat, gray))
         
         # 归一化
-        removeShadowMat = cv2.normalize(calcMat, None, 0, 180, cv2.NORM_MINMAX)
+        removeShadowMat = cv2.normalize(calcMat, None, 0, 200, cv2.NORM_MINMAX)
         
         # 双边滤波
         bilateral_blur2 = cv2.bilateralFilter(removeShadowMat, 9, 75, 75)
         bilateral_blur3 = cv2.bilateralFilter(bilateral_blur2, 9, 75, 75)
         
         # 二值化
-        _, thresh = cv2.threshold(bilateral_blur3, 100, 255, cv2.THRESH_BINARY_INV)
+        _, thresh = cv2.threshold(bilateral_blur3, 155, 255, cv2.THRESH_BINARY_INV)
         
         # 形态学操作：腐蚀+膨胀
         kernel1 = np.ones((3, 3), np.uint8)
@@ -152,7 +152,7 @@ class CircleDetector:
 
     def run(self):
         """运行圆环检测程序"""
-        cap = cv2.VideoCapture(0)  # 使用默认摄像头0
+        cap = cv2.VideoCapture(1)  # 使用默认摄像头1
         
         while True:
             ret, frame = cap.read()
@@ -167,7 +167,7 @@ class CircleDetector:
             
             # 显示结果
             cv2.imshow('Circle Detection', display_frame)
-            
+            cv2.imshow('Mask', self.preprocess_frame(frame))
             # 按q退出
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
