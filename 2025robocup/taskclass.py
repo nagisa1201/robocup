@@ -11,8 +11,8 @@ class PreprocessingTask:
         self.frame_width = camera_frame.shape[1]
         self.frame_height = camera_frame.shape[0]
         self.isfinished = False
-        self.min_thresh = 50
-        self.max_thresh = 166
+        self.min_thresh = 155
+        self.max_thresh = 255
 
     def preprocess(self):
         """
@@ -26,17 +26,17 @@ class PreprocessingTask:
         else:
             gray = medianBlur.copy()  # 已经是灰度图则直接使用
         element = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-        iteration = 21
+        iteration = 5
         closeMat = cv2.morphologyEx(gray, cv2.MORPH_CLOSE, element, iterations=iteration)
         calcMat = cv2.bitwise_not(cv2.subtract(closeMat, gray))
-        removeShadowMat = cv2.normalize(calcMat, None, 0, 200, cv2.NORM_MINMAX)
+        removeShadowMat = cv2.normalize(calcMat, None, 0, 180, cv2.NORM_MINMAX)
         bilateral_blur2=cv2.bilateralFilter(removeShadowMat,9,75,75)
         
         bilateral_blur3=cv2.bilateralFilter(bilateral_blur2,9,75,75)
         _, thresh = cv2.threshold(bilateral_blur3, self.min_thresh, self.max_thresh, cv2.THRESH_BINARY_INV)
-        kernel1 = np.ones((5, 5), np.uint8)
+        kernel1 = np.ones((3, 3), np.uint8)
         eroded = cv2.erode(thresh, kernel1, iterations=1)
-        kernel2 = np.ones((5, 5), np.uint8)
+        kernel2 = np.ones((3, 3), np.uint8)
         dilated = cv2.dilate(eroded, kernel2, iterations=1)
         self.camera_frame = dilated
         self.isfinished = True
