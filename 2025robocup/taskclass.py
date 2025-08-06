@@ -41,8 +41,6 @@ class PreprocessingTask:
         self.camera_frame = dilated
         self.isfinished = True
 
-
-
 class QRCodeTask:
     """
     二维码任务类:对帧流进行二维码检测和解码
@@ -52,6 +50,7 @@ class QRCodeTask:
         self.qr_detector = cv2.QRCodeDetector()
         self.code_data = None # 最终引用的解码后的二维码数据
         self.isdetected = False # 最终判断二维码是否被检测到的标志位
+        self.best_circle = None # 最佳圆环
     def detect_and_decode(self):
         """
         检测并解码二维码
@@ -85,15 +84,85 @@ class QRCodeTask:
                 cv2.putText(self.camera_frame, f"QRCodes Numbers: {len(decoded_info)}", (10, 30), 
                            font, font_scale, font_color, line_type)
         return self.camera_frame
+    
 class CircleTask:
     """
     圆形检测任务类:对帧流进行多圆环检测
     """
-    def __init__(self, camera_frame):
-        self.camera_frame = camera_frame
+    def __init__(self, frame):
+        self.processed_frame = frame
         self.isdetected = False  # 最终判断圆环是否被检测到的标志位
-        self.frame_width = camera_frame.shape[1]
-        self.frame_height = camera_frame.shape[0]
+        self.best_circle = None  # 最佳圆环
+        self.min_area = 1000
+        self.max_area = 50000
+        self.min_circularity = 0.5
+        self.min_convexity = 0.6
+    def detect_best_circle(self):
+        """检测最佳圆环"""
+        mask = self.processed_frame
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        max_score = 0
+        for contour in contours:
+            # 计算轮廓面积
+            area = cv2.contourArea(contour)
+            
+            # 过滤面积不满足条件的轮廓
+            if area < self.min_area or area > self.max_area:
+                continue
+            
+            # 计算轮廓的圆度
+            perimeter = cv2.arcLength(contour, True)
+            if perimeter <= 0:
+                continue  # 避免除零错误
+            circularity = 4 * np.pi * area / (perimeter * perimeter)
+            
+            # 计算轮廓的凸度
+            hull = cv2.convexHull(contour)
+            hull_area = cv2.contourArea(hull)
+            if hull_area <= 0:
+                continue  # 避免除零错误
+            convexity = area / hull_area
+            
+            # 过滤圆度和凸度不满足条件的轮廓
+            if circularity < self.min_circularity or convexity < self.min_convexity:
+                continue
+            
+            # 计算最小包围圆
+            (x, y), radius = cv2.minEnclosingCircle(contour)
+            
+            # 计算轮廓矩以获取重心（更精确的中心估计）
+            M = cv2.moments(contour)
+            if M["m00"] > 0:  # 避免除以零
+                cX = int(M["m10"] / M["m00"])
+                cY = int(M["m01"] / M["m00"])
+                center = (cX, cY)
+            else:
+                center = (int(x), int(y))
+            
+            # 综合评分
+            score = 0.8 * circularity + 0.2 * convexity
+            
+            # 筛选最佳圆环
+            if score > max_score:
+                max_score = score
+                self.best_circle = {
+                    'center': center,
+                    'radius': int(radius),
+                    'contour': contour,
+                    'score': score,
+                    'area': area,
+                    'circularity': circularity,
+                    'convexity': convexity
+                }
+    def draw_best_circle(self):
+        """在图像上绘制最佳圆环"""
+        if self.best_circle is not None:
+            center = self.best_circle['center']
+            radius = self.best_circle['radius']
+            cv2.circle(self.processed_frame, center, radius, (0, 255, 0), 2)
+            cv2.putText(self.processed_frame, f"Best Circle: {self.best_circle['score']:.2f}", 
+                        (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        return self.processed_frame
 
 
 
@@ -114,6 +183,9 @@ if __name__ == "__main__":
         preprocessing_task.preprocess()
         process_frame = preprocessing_task.camera_frame
         qr_task = QRCodeTask(frame)
+        circle_task = CircleTask(process_frame)
+        circle_task.detect_best_circle()
+        process_frame = circle_task.draw_best_circle()
 
         decoded_info, points = qr_task.detect_and_decode()
         frame = qr_task.draw_qrcode_info(decoded_info, points)
