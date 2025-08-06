@@ -98,11 +98,20 @@ class CircleTask:
         self.max_area = 50000
         self.min_circularity = 0.5
         self.min_convexity = 0.6
+        self.x_bias = 0
+        self.y_bias = 0
+        self.frame_size = (frame.shape[1], frame.shape[0])  # 存储图像尺寸（宽, 高）
+        self.image_center = (self.frame_size[0] // 2, self.frame_size[1] // 2)  # 计算图像中心点
+
     def detect_best_circle(self):
         """检测最佳圆环"""
         mask = self.processed_frame
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         max_score = 0
+        self.best_circle = None
+        self.isdetected = False
+        self.x_bias = 0
+        self.y_bias = 0
         for contour in contours:
             # 计算轮廓面积
             area = cv2.contourArea(contour)
@@ -155,14 +164,40 @@ class CircleTask:
                     'circularity': circularity,
                     'convexity': convexity
                 }
+                self.isdetected = True
+                self.x_bias = center[0] - self.image_center[0]
+                self.y_bias = center[1] - self.image_center[1]
+
     def draw_best_circle(self,frame):
         """在图像上绘制最佳圆环"""
-        if self.best_circle is not None:
-            center = self.best_circle['center']
-            radius = self.best_circle['radius']
-            cv2.circle(frame, center, radius, (0, 255, 0), 2)
-            cv2.putText(frame, f"Best Circle: {self.best_circle['score']:.2f}", 
-                        (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        if self.best_circle is None:
+            return frame
+        center = self.best_circle['center']
+        radius = self.best_circle['radius']
+        
+        # 绘制最佳圆环
+        cv2.circle(frame, center, radius, (0, 255, 0), 2)
+        # 绘制圆心（红色点）
+        cv2.circle(frame, center, 5, (0, 0, 255), -1)
+        # 绘制图像中心（蓝色点）
+        cv2.circle(frame, self.image_center, 5, (255, 0, 0), -1)
+        # 绘制矩形偏移框（绿色）
+        rect_top_left = (self.image_center[0], self.image_center[1])
+        rect_bottom_right = (self.image_center[0] + self.x_bias, self.image_center[1] + self.y_bias)
+        cv2.rectangle(frame, rect_top_left, rect_bottom_right, (0, 255, 0), 2)
+        # 绘制对角线（红色对角线）
+        cv2.line(frame, self.image_center, center, (0, 0, 255), 2)
+        # 显示偏移信息
+        cv2.putText(frame, f"X_bias: {self.x_bias}px", 
+                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        cv2.putText(frame, f"Y_bias: {self.y_bias}px", 
+                    (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        cv2.putText(frame, f"distance: {np.sqrt(self.x_bias**2 + self.y_bias**2):.2f}px", 
+                    (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        # 显示检测分数
+        cv2.putText(frame, f"score: {self.best_circle['score']:.2f}", 
+                    (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+        print(f"偏移量: X={self.x_bias}, Y={self.y_bias}") # 偏移量坐标是以中心为原点，X轴向右为正，Y轴向下为正
         return frame
 
 
