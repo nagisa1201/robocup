@@ -2,6 +2,43 @@ import cv2
 import numpy as np
 from filterpy.kalman import KalmanFilter
 import time 
+import serial 
+import asyncio
+import threading
+
+class KalmanFilter1D:
+    """
+    一维卡尔曼滤波器（基于filterpy库）
+    """
+    def __init__(self, initial_state, Q=0.01, R=0.5):
+        """
+        初始化滤波器
+        :param initial_state: 初始状态值
+        :param Q: 过程噪声方差（系统不确定性）
+        :param R: 测量噪声方差（传感器精度）
+        """
+        self.kf = KalmanFilter(dim_x=1, dim_z=1)
+        self.kf.F = np.array([[1]])    # 状态转移矩阵（恒定模型）
+        self.kf.H = np.array([[1]])    # 观测矩阵
+        self.kf.Q = np.array([[Q]])    # 过程噪声协方差
+        self.kf.R = np.array([[R]])    # 测量噪声协方差
+        self.kf.x = np.array([initial_state])  # 初始状态
+        self.kf.P = np.array([[1]])    # 初始估计协方差
+
+    def update(self, measurement):
+        """
+        更新滤波器状态
+        :param measurement: 新测量值
+        :return: 滤波后的状态
+        """
+        self.kf.predict()
+        self.kf.update(np.array([measurement]))
+        return self.kf.x[0]
+    
+    def reset(self, value):
+        """重置滤波器状态"""
+        self.kf.x = np.array([value])
+        self.kf.P = np.array([[1]])
 
 class PreprocessingTask:
     """
@@ -102,7 +139,13 @@ class CircleTask:
         self.y_bias = 0
         self.frame_size = (frame.shape[1], frame.shape[0])  # 存储图像尺寸（宽, 高）
         self.image_center = (self.frame_size[0] // 2, self.frame_size[1] // 2)  # 计算图像中心点
-
+        # 添加卡尔曼滤波器实例
+        self.kalman_x = KalmanFilter1D(initial_state=0, Q=0.1, R=0.1)
+        self.kalman_y = KalmanFilter1D(initial_state=0, Q=0.1, R=0.1)
+        
+        # 添加滤波后的偏移量
+        self.filtered_x_bias = 0
+        self.filtered_y_bias = 0
     def detect_best_circle(self):
         """检测最佳圆环"""
         mask = self.processed_frame
@@ -167,7 +210,17 @@ class CircleTask:
                 self.isdetected = True
                 self.x_bias = center[0] - self.image_center[0]
                 self.y_bias = center[1] - self.image_center[1]
-
+                        # 在检测到圆心后更新卡尔曼滤波器
+                if self.isdetected:
+                    self.filtered_x_bias = self.kalman_x.update(self.x_bias)
+                    self.filtered_y_bias = self.kalman_y.update(self.y_bias)
+                else:
+                    # 未检测时重置滤波器
+                    self.kalman_x.reset(0)
+                    self.kalman_y.reset(0)
+                    self.filtered_x_bias = 0
+                    self.filtered_y_bias = 0
+                    
     def draw_best_circle(self,frame):
         """在图像上绘制最佳圆环"""
         if self.best_circle is None:
@@ -194,12 +247,21 @@ class CircleTask:
                     (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
         cv2.putText(frame, f"distance: {np.sqrt(self.x_bias**2 + self.y_bias**2):.2f}px", 
                     (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+
         # 显示检测分数
         cv2.putText(frame, f"score: {self.best_circle['score']:.2f}", 
                     (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
         print(f"偏移量: X={self.x_bias}, Y={self.y_bias}") # 偏移量坐标是以中心为原点，X轴向右为正，Y轴向下为正
+        print(f"滤波后的偏移量: X={self.filtered_x_bias}, Y={self.filtered_y_bias}")  # 打印滤波后的偏移量
         return frame
 
+class SerialTask:
+    """
+    串口通信任务类:用于与外部设备进行串口通信
+    """
+    def __init__(self, port, baudrate):
+        self.port = port
+        self.baudrate = baudrate
 
 if __name__ == "__main__":
     cv2.namedWindow("Processed Frame")
