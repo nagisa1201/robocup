@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 from filterpy.kalman import KalmanFilter
 import time 
+
 class PreprocessingTask:
     """
     预处理任务类:对帧流进行预处理
@@ -154,17 +155,15 @@ class CircleTask:
                     'circularity': circularity,
                     'convexity': convexity
                 }
-    def draw_best_circle(self):
+    def draw_best_circle(self,frame):
         """在图像上绘制最佳圆环"""
         if self.best_circle is not None:
             center = self.best_circle['center']
             radius = self.best_circle['radius']
-            cv2.circle(self.processed_frame, center, radius, (0, 255, 0), 2)
-            cv2.putText(self.processed_frame, f"Best Circle: {self.best_circle['score']:.2f}", 
+            cv2.circle(frame, center, radius, (0, 255, 0), 2)
+            cv2.putText(frame, f"Best Circle: {self.best_circle['score']:.2f}", 
                         (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-        return self.processed_frame
-
-
+        return frame
 
 
 if __name__ == "__main__":
@@ -185,13 +184,14 @@ if __name__ == "__main__":
         qr_task = QRCodeTask(frame)
         circle_task = CircleTask(process_frame)
         circle_task.detect_best_circle()
-        process_frame = circle_task.draw_best_circle()
+        circle_frame = circle_task.draw_best_circle(frame)
 
         decoded_info, points = qr_task.detect_and_decode()
-        frame = qr_task.draw_qrcode_info(decoded_info, points)
+        qr_frame = qr_task.draw_qrcode_info(decoded_info, points)
         print(f"检测到二维码: {qr_task.code_data}")
-        cv2.imshow("QR Code Detection", frame)
+        cv2.imshow("QR Code Detection", qr_frame)
         cv2.imshow("Processed Frame", process_frame)
+        cv2.imshow("Circle Detection", circle_frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
     cap.release()
