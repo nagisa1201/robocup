@@ -423,38 +423,6 @@ class CircleDetector:
         
         return circle_info
 
-    def estimate_color(self, frame, contour):
-        """估计颜色，增加边界检查"""
-        # 确保输入有效
-        if frame is None or contour is None or len(contour) == 0:
-            return (0, 0, 0)
-            
-        # 创建掩码
-        mask = np.zeros_like(frame[:,:,0])
-        cv2.drawContours(mask, [contour], -1, 255, -1)
-        
-        # 确保掩码和帧尺寸匹配
-        if mask.shape != frame.shape[:2]:
-            return (0, 0, 0)
-            
-        # 计算平均颜色
-        masked = cv2.bitwise_and(frame, frame, mask=mask)
-        mean_color = cv2.mean(masked, mask=mask)[:3]
-        
-        return tuple([int(c) for c in mean_color])
-
-    def filter_color(self, new_color):
-        """平滑颜色变化"""
-        self.color_history.append(new_color)
-        
-        # 保持历史长度
-        if len(self.color_history) > 10:
-            self.color_history.pop(0)
-        
-        # 计算平均颜色
-        avg_color = np.mean(self.color_history, axis=0)
-        return tuple([int(c) for c in avg_color])
-
     def visualize_results(self, frame, circle_info):
         """可视化结果，增加边界检查避免越界绘制"""
         if circle_info is None or frame is None or frame.size == 0:

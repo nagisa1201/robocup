@@ -6,9 +6,9 @@ import pyzbar.pyzbar as pyzbar
 import time
 import struct
 from filterpy.kalman import KalmanFilter
-import easyocr
+# import easyocr
 
-reader = easyocr.Reader(['en'])
+# reader = easyocr.Reader(['en'])
 
 width = 640
 height = 480
@@ -59,30 +59,30 @@ def detect_characters(frame):
                     print(f"Detected at {angle} degrees: {text}")
     return detected_text
 ############任务二函数结束############
-def send_data(ser,Head,x:float,y:float,color:float,tail):
-    data_to_send = bytearray()
+# def send_data(ser,Head,x:float,y:float,color:float,tail):
+#     data_to_send = bytearray()
 
-    # 添加header
-    data_to_send.extend(struct.pack('<B', Head))
+#     # 添加header
+#     data_to_send.extend(struct.pack('<B', Head))
 
-    # 添加每个one_place结构的数据
-    # for place in places:
-    data_to_send.extend(struct.pack('<f', x))  # x
-    data_to_send.extend(struct.pack('<f', y))  # y
-    data_to_send.extend(struct.pack('<f', color))  # color
+#     # 添加每个one_place结构的数据
+#     # for place in places:
+#     data_to_send.extend(struct.pack('<f', x))  # x
+#     data_to_send.extend(struct.pack('<f', y))  # y
+#     data_to_send.extend(struct.pack('<f', color))  # color
 
-    # 添加tail
-    data_to_send.extend(struct.pack('<B', tail))
+#     # 添加tail
+#     data_to_send.extend(struct.pack('<B', tail))
 
-    # # 通过串口发送数据
-    ser.write(data_to_send)
-# 串口配置
-SERIAL_PORT = '/dev/ttyS6'  # 替换为你的串口设备
-BAUD_RATE = 115200
-TIMEOUT = 1
+#     # # 通过串口发送数据
+#     ser.write(data_to_send)
+# # 串口配置
+# SERIAL_PORT = '/dev/ttyS6'  # 替换为你的串口设备
+# BAUD_RATE = 115200
+# TIMEOUT = 1
 
-# 初始化串口
-ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=TIMEOUT)
+# # 初始化串口
+# ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=TIMEOUT)
 
 # 参数
 min_area = 2500
@@ -227,61 +227,62 @@ def main():
     QRflag=False
     anpfalg=False
     global last_valid_angle  # 确保能够更新全局变量
-    cap = cv2.VideoCapture(4)
+    cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
     while True:
         _,frame=cap.read()
-        if ser.in_waiting > 0:
-            data = ser.read().decode('utf-8').strip()
-            print(data)
-            if data == '1':
-                crossflag=True
-                QRflag=False
-                anpfalg=False
-            elif data == '2':
-                crossflag=False
-                QRflag=True
-                anpfalg=False
-            elif data == '3':
-                crossflag=False
-                QRflag=False
-                anpfalg=True
-        if crossflag==True:
-            offset_x,offset_y,min_angle,thresh,removeShadowMat = cross_angle(frame)
-            if np.isfinite(min_angle):  # 如果 min_angle 有效
-                kf.predict()
-                kf.update(np.array([min_angle]))
-                last_valid_angle = min_angle  # 更新最后的有效值
-                filtered_angle = kf.x
-                print(offset_x,offset_y,min_angle,filtered_angle)
-            else:
-                kf.predict()  # 只进行预测，不更新状态
-            if offset_x is not None:
-                send_data(ser, 0xFA, offset_x, filtered_angle, offset_y, 0xAF)
-        if QRflag==True:
-            QRcode=None
-            QRcode=barcode_reader(frame)
-            print(QRcode)
+        # if ser.in_waiting > 0:
+        #     data = ser.read().decode('utf-8').strip()
+            # print(data)
+            # if data == '1':
+            #     crossflag=True
+            #     QRflag=False
+            #     anpfalg=False
+            # elif data == '2':
+            #     crossflag=False
+            #     QRflag=True
+            #     anpfalg=False
+            # elif data == '3':
+            #     crossflag=False
+            #     QRflag=False
+            #     anpfalg=True
+        # if crossflag==True:
+        #     offset_x,offset_y,min_angle,thresh,removeShadowMat = cross_angle(frame)
+        #     if np.isfinite(min_angle):  # 如果 min_angle 有效
+        #         kf.predict()
+        #         kf.update(np.array([min_angle]))
+        #         last_valid_angle = min_angle  # 更新最后的有效值
+        #         filtered_angle = kf.x
+        #         print(offset_x,offset_y,min_angle,filtered_angle)
+        #     else:
+        #         kf.predict()  # 只进行预测，不更新状态
+        #     if offset_x is not None:
+        #         send_data(ser, 0xFA, offset_x, filtered_angle, offset_y, 0xAF)
+        # if QRflag==True:
+        #     QRcode=None
+        #     QRcode=barcode_reader(frame)
+        #     print(QRcode)
             
-            if QRcode!=None:
-                QRcode=float(QRcode)
-                send_data(ser, 0xFB, 0, 0, QRcode, 0xBF)
-        if anpfalg==True:
-            detected_text = detect_characters(frame)
-            if detected_text:
-                print(f"Detected text: {detected_text}")
-                for text in detected_text:
-                    if text == 'A':
-                        send_data(ser, 0xFC, 0, 0, 0, 0xCF)
-                    elif text == 'B':
-                        send_data(ser, 0xFC, 0, 0, 1, 0xCF)
-                    elif text == 'C':
-                        send_data(ser, 0xFC, 0, 0, 2, 0xCF)
+        #     if QRcode!=None:
+        #         QRcode=float(QRcode)
+        #         send_data(ser, 0xFB, 0, 0, QRcode, 0xBF)
+        # if anpfalg==True:
+        #     detected_text = detect_characters(frame)
+        #     if detected_text:
+        #         print(f"Detected text: {detected_text}")
+        #         for text in detected_text:
+        #             if text == 'A':
+        #                 send_data(ser, 0xFC, 0, 0, 0, 0xCF)
+        #             elif text == 'B':
+        #                 send_data(ser, 0xFC, 0, 0, 1, 0xCF)
+        #             elif text == 'C':
+        #                 send_data(ser, 0xFC, 0, 0, 2, 0xCF)
+        # cv2.imshow('output', frame)
+        # if thresh is not None:
+        #     cv2.imshow('thresh',thresh)
+        #     cv2.imshow('removeShadowMat',removeShadowMat)
         cv2.imshow('output', frame)
-        if thresh is not None:
-            cv2.imshow('thresh',thresh)
-            cv2.imshow('removeShadowMat',removeShadowMat)
         key = cv2.waitKey(1)
         if key == 27:
             break
